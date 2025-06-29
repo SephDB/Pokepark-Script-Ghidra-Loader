@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/language_definitions.rxg -->
+
+<language_definitions>
+<!-- Uncomment the following to make the language available in Ghidra -->
+
+   <language processor="Fscript"
+            endian="big"
+            size="32"
+            variant="default"
+            version="1.0"
+            slafile="fscript.sla"
+            processorspec="fscript.pspec"
+            id="fscript:BE:32:default">
+    <description>Fscript Language Module</description>
+    <compiler name="default" spec="fscript.cspec" id="default"/>
+  </language>
+</language_definitions>

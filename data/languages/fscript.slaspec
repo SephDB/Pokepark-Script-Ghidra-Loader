@@ -1,0 +1,433 @@
+define endian=big;
+define alignment=1;
+
+define space ram     type=ram_space      size=4  default;
+
+define space register type=register_space size=4;
+
+define register offset=0 size=4 [ RES PC SP SF ARG STR ];
+
+define token op (32)
+	opcode = (0,7)
+	subtype = (8,15)
+	indirect_load = (12,12)
+	operand = (16,31) signed
+	syscall_page = (26,31)
+	syscall_func = (16,25)
+	imm = (8,31)
+	simm = (8,31) signed
+;
+
+define token data32 (32)
+	imm32 = (0,31)
+;
+
+define pcodeop Pause;
+define pcodeop Exit;
+define pcodeop SysCall;
+
+macro pushSP(val) {
+	SP = SP - 4;
+	*:4 SP = val;
+}
+
+macro popSP(ret) {
+	ret = *:4 SP;
+	SP = SP + 4;
+}
+
+opoff: reloc is operand [reloc=inst_next+operand*4;] {export *:4 reloc;}
+
+op4: operand is operand {
+	local reloc:4;
+	reloc = operand*4;
+	export reloc;
+}
+
+#Dummy syscall instruction for completeness, full set is down below
+:SC syscall_page:syscall_func(subtype) is opcode=0x1 & subtype & syscall_page & syscall_func {
+	RES = SysCall(syscall_page:2,syscall_func:2);
+	SP = SP + subtype*4;
+}
+
+:delay operand is opcode=0x2 & subtype=0 & operand {
+	Pause(operand:4);
+}
+:exit_1 is opcode=0x2 & subtype=1 unimpl
+:exit_2 "reset" is opcode=0x2 & subtype=2 unimpl 
+:delay_load is opcode=0x2 & subtype=3 {
+	local delayAmount:4;
+	popSP(delayAmount);
+	Pause(delayAmount);
+}
+:delay_neq0 is opcode=0x2 & subtype=4 {
+	local delay:4;
+	popSP(delay);
+	if(delay == 0) goto inst_next;
+	Pause(delay-1);
+}
+:set_arg_mode is opcode=0x2 & subtype=5 {} #Makes the next load_arg not set the script ret local var???
+
+
+:call opoff is opcode=0x3 & opoff {call opoff;}
+
+:ret -operand is opcode=0x6 & subtype = 0 & operand & op4 {
+	SP = SP + op4;
+	return [SF];
+}
+:retv -operand is opcode=0x6 & operand & op4 {
+	RES = *:4 SP;
+	local off:4 = op4+4;
+	SP = SP + off;
+	return [SF];
+}
+
+:grow_stack operand is opcode=0x7 & operand & op4 {
+	SP=SP-op4;
+}
+
+:jmp => opoff is opcode=0x8 & subtype=0 & opoff {goto opoff;}
+:jnz => opoff is opcode=0x8 & subtype=1 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg != 0) goto opoff;
+}
+:jz => opoff is opcode=0x8 & subtype=2 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg == 0) goto opoff;
+}
+:jnzPause => opoff is opcode=0x8 & subtype=3 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg == 0) goto inst_next;
+	Pause();
+	goto opoff;
+}
+:jzPause => opoff is opcode=0x8 & subtype=4 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg != 0) goto inst_next;
+	Pause();
+	goto opoff;
+}
+:jnzSet => opoff is opcode=0x8 & subtype=5 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg == 0) goto inst_next;
+	pushSP(1:4);
+	goto opoff;
+}
+:jzSet => opoff is opcode=0x8 & subtype=6 & operand & opoff {
+	local arg:4;
+	popSP(arg);
+	if (arg != 0) goto inst_next;
+	pushSP(0:4);
+	goto opoff;
+}
+:jeq => opoff is opcode=0x8 & subtype=7 & operand & opoff {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	if (arg1 == arg2) goto opoff;
+	pushSP(arg2);
+}
+
+:jeq_imm subtype => opoff is opcode=0xa & subtype & operand & opoff {
+	if(subtype != *:4 SP) goto inst_next;
+	SP = SP + 4;
+	goto opoff;
+}
+
+:load_arg operand is opcode=0xb & operand {
+	local arg = ARG + operand*4;
+	pushSP(*:4 arg);
+}
+
+:store_arg operand is opcode=0xc & operand & subtype=0 & op4 {
+	local loc = ARG + op4;
+	local val:4;
+	popSP(val);
+	*:4 loc = val;
+}
+:arg_addi operand is opcode=0xc & operand & subtype=1 & op4 {
+	local loc = ARG + op4;
+	local val:4;
+	popSP(val);
+	local orig:4 = *:4 loc;
+	*:4 loc = orig + val;
+}
+:arg_subi operand is opcode=0xc & operand & subtype=2 & op4 {
+	local loc = ARG + op4;
+	local val:4;
+	popSP(val);
+	local orig:4 = *:4 loc;
+	*:4 loc = orig - val;
+}
+
+:shrink_stack operand is opcode=0xf & operand & op4 {SP=SP+op4;}
+
+:push operand is opcode=0x10 & operand {
+	pushSP(operand:4);
+}
+
+:push_imm imm32 is opcode=0x11 ; imm32 {
+	pushSP(imm32:4);
+}
+
+:push_result is opcode=0x12 {
+	pushSP(RES);
+}
+
+
+:lstr imm is opcode=0x13 & imm {
+	local val:4 = STR+imm;
+	pushSP(val);
+}
+
+:add is opcode=0x14 & operand=0 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1+arg2);
+}
+:sub is opcode=0x14 & operand=1 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1-arg2);
+}
+:mul is opcode=0x14 & operand=2 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1*arg2);
+}
+:div is opcode=0x14 & operand=3 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 s/ arg2);
+}
+:mod is opcode=0x14 & operand=4 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 s% arg2);
+}
+:and is opcode=0x14 & operand=5 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1&arg2);
+}
+:or is opcode=0x14 & operand=6 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1|arg2);
+}
+:xor is opcode=0x14 & operand=7 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1^arg2);
+}
+:not is opcode=0x14 & operand=8 {
+	local arg1:4;
+	popSP(arg1);
+	arg1 = ~arg1;
+	pushSP(arg1);
+}
+:eq0 is opcode=0x14 & operand=9 {
+	local arg1:4;
+	popSP(arg1);
+	local res:4 = zext(arg1 == 0);
+	pushSP(res);
+}
+:neg is opcode=0x14 & operand=10 {
+	local arg:4;
+	popSP(arg);
+	pushSP(-arg);
+}
+
+:fadd is opcode=0x15 & operand=0 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 f+ arg2);
+}
+:fsub is opcode=0x15 & operand=1 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 f- arg2);
+}
+:fmul is opcode=0x15 & operand=2 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 f* arg2);
+}
+:fdiv is opcode=0x15 & operand=3 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	pushSP(arg1 f/ arg2);
+}
+:feq0 is opcode=0x15 & operand=9 {
+	local arg1:4;
+	popSP(arg1);
+	local res:4 = zext(arg1 == 0);
+	pushSP(res);
+}
+:fneg is opcode=0x15 & operand=10 {
+	local arg:4;
+	popSP(arg);
+	pushSP(f-arg);
+}
+
+:eq is opcode=0x16 & operand=0xb {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1==arg2);
+	pushSP(res);
+}
+:neq is opcode=0x16 & operand=0xc {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1!=arg2);
+	pushSP(res);
+}
+:lt is opcode=0x16 & operand=0xd {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1<arg2);
+	pushSP(res);
+}
+:gt is opcode=0x16 & operand=0xe {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1>arg2);
+	pushSP(res);
+}
+:le is opcode=0x16 & operand=0xf {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1<=arg2);
+	pushSP(res);
+}
+:ge is opcode=0x16 & operand=0x10 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1>=arg2);
+	pushSP(res);
+}
+
+:feq is opcode=0x17 & operand=0xb {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f== arg2);
+	pushSP(res);
+}
+:fneq is opcode=0x17 & operand=0xc {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f!= arg2);
+	pushSP(res);
+}
+:flt is opcode=0x17 & operand=0xd {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f< arg2);
+	pushSP(res);
+}
+:fgt is opcode=0x17 & operand=0xe {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f> arg2);
+	pushSP(res);
+}
+:fle is opcode=0x17 & operand=0xf {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f<= arg2);
+	pushSP(res);
+}
+:fge is opcode=0x17 & operand=0x10 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg1);
+	popSP(arg2);
+	local res:4 = zext(arg1 f>= arg2);
+	pushSP(res);
+}
+
+:lea dest is opcode=0x19 & simm [dest=inst_next+simm*4;] {
+	pushSP(dest:4);
+}
+
+:lw is opcode=0x1a & operand=4 & indirect_load=0 {
+	local addr:4;
+	popSP(addr);
+	local val:4 = *:4 addr;
+	pushSP(val);
+}
+
+:lwi is opcode=0x1a & operand=4 & indirect_load=1 {
+	local addr:4;
+	local off:4;
+	popSP(off);
+	popSP(addr);
+	addr = addr + off*4;
+	local val:4 = *:4 addr;
+	pushSP(val);
+}
+
+:itof operand is opcode=0x1c & subtype=0 & operand {
+	local ptr = SP+operand;
+	*:4 ptr = int2float(*:4 ptr);
+}
+
+:ftoi operand is opcode=0x1c & subtype=1 & operand {
+	local ptr = SP+operand;
+	*:4 ptr = trunc(*:4 ptr);
+}
+
+#Code generation go brrr
+@include "sc.sinc"

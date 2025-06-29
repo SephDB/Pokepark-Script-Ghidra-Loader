@@ -1,0 +1,104 @@
+:SC1 syscall_page:syscall_func is opcode=0x1 & subtype=1 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1);
+}
+:SC2 syscall_page:syscall_func is opcode=0x1 & subtype=2 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2);
+}
+:SC3 syscall_page:syscall_func is opcode=0x1 & subtype=3 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3);
+}
+:SC4 syscall_page:syscall_func is opcode=0x1 & subtype=4 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    local arg4:4;
+    popSP(arg4);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3,arg4);
+}
+:SC5 syscall_page:syscall_func is opcode=0x1 & subtype=5 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    local arg4:4;
+    popSP(arg4);
+    local arg5:4;
+    popSP(arg5);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3,arg4,arg5);
+}
+:SC6 syscall_page:syscall_func is opcode=0x1 & subtype=6 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    local arg4:4;
+    popSP(arg4);
+    local arg5:4;
+    popSP(arg5);
+    local arg6:4;
+    popSP(arg6);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3,arg4,arg5,arg6);
+}
+:SC7 syscall_page:syscall_func is opcode=0x1 & subtype=7 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    local arg4:4;
+    popSP(arg4);
+    local arg5:4;
+    popSP(arg5);
+    local arg6:4;
+    popSP(arg6);
+    local arg7:4;
+    popSP(arg7);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3,arg4,arg5,arg6,arg7);
+}
+:SC8 syscall_page:syscall_func is opcode=0x1 & subtype=8 & syscall_page & syscall_func {
+    local arg1:4;
+    popSP(arg1);
+    local arg2:4;
+    popSP(arg2);
+    local arg3:4;
+    popSP(arg3);
+    local arg4:4;
+    popSP(arg4);
+    local arg5:4;
+    popSP(arg5);
+    local arg6:4;
+    popSP(arg6);
+    local arg7:4;
+    popSP(arg7);
+    local arg8:4;
+    popSP(arg8);
+    
+    RES = SysCall(syscall_page:2,syscall_func:2,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/processor_spec.rxg -->
+
+<processor_spec>
+  <properties>
+    <!-- <property key="pcodeInjectLibraryClass" value="fscript_bytecode.pcode.PcodeInjectLibraryFScript"/> -->
+    <property key="DecompilerParameterAnalyzer.enabled" value="false"/> <!-- we have a better one -->
+  </properties>
+  <programcounter register="PC"/>
+</processor_spec>
