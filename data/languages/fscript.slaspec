@@ -10,6 +10,7 @@ define register offset=0 size=4 [ RES PC SP SF ARG STR ];
 define token op (32)
 	opcode = (0,7)
 	subtype = (8,15)
+	sop = (8,11)
 	indirect_load = (12,12)
 	operand = (16,31) signed
 	syscall_page = (26,31)
@@ -398,25 +399,147 @@ op4: operand is operand {
 	pushSP(res);
 }
 
+:sl is opcode=0x18 & operand=0 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	arg1 = arg1 << arg2;
+	pushSP(arg1);
+}
+
+:srm is opcode=0x18 & operand=1 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	arg2 = arg2 & 63;
+	arg1 = arg1 >> arg2;
+	pushSP(arg1);
+}
+
+:sr is opcode=0x18 & operand=2 {
+	local arg1:4;
+	local arg2:4;
+	popSP(arg2);
+	popSP(arg1);
+	arg1 = arg1 >> arg2;
+	pushSP(arg1);
+}
+
+
 :lea dest is opcode=0x19 & simm [dest=inst_next+simm*4;] {
 	pushSP(dest:4);
 }
 
-:lw is opcode=0x1a & operand=4 & indirect_load=0 {
+opsize: "b" is operand=1 {}
+opsize: "s" is operand=2 {}
+opsize: "w" is operand=4 {}
+
+indirect_offset: "i" is indirect_load=1 & operand {
+	local off:4;
+	popSP(off);
+	off = off * operand;
+	export off;
+}
+
+indirect_offset: is indirect_load=0 {
+	local off:4 = 0;
+	export off;
+}
+
+address: ^opsize^indirect_offset is opsize & indirect_offset {
 	local addr:4;
 	popSP(addr);
-	local val:4 = *:4 addr;
+	addr = addr+indirect_offset;
+	export addr;
+}
+
+sized_val1: is operand=1 {
+	local val:4;
+	popSP(val);
+	local ret:1 = val:1;
+	export ret;
+}
+
+sized_val2: is operand=2 {
+	local val:4;
+	popSP(val);
+	local ret:2 = val:2;
+	export ret;
+}
+
+sized_val4: is operand=4 {
+	local val:4;
+	popSP(val);
+	export val;
+}
+
+:l^address is opcode=0x1a & address & operand=1 {
+	local val:4 = sext(*:1 address);
+	pushSP(val);
+}
+:l^address is opcode=0x1a & address & operand=2 {
+	local val:4 = sext(*:2 address);
+	pushSP(val);
+}
+:l^address is opcode=0x1a & address & operand=4 {
+	local val:4 = *address;
 	pushSP(val);
 }
 
-:lwi is opcode=0x1a & operand=4 & indirect_load=1 {
-	local addr:4;
-	local off:4;
-	popSP(off);
-	popSP(addr);
-	addr = addr + off*4;
-	local val:4 = *:4 addr;
-	pushSP(val);
+:s^address is opcode=0x1b & sop=0 & address & sized_val1 {
+	build address;
+	build sized_val1;
+	*address = sized_val1;
+}
+:s^address is opcode=0x1b & sop=0 & address & sized_val2 {
+	build address;
+	build sized_val2;
+	*address = sized_val2;
+}
+:s^address is opcode=0x1b & sop=0 & address & sized_val4 {
+	build address;
+	build sized_val4;
+	*address = sized_val4;
+}
+
+:s^address^"add" is opcode=0x1b & sop=1 & address & sized_val1 {
+	build address;
+	build sized_val1;
+	local tmp:1 = *address;
+	*address = tmp+sized_val1;
+}
+:s^address^"add" is opcode=0x1b & sop=1 & address & sized_val2 {
+	build address;
+	build sized_val2;
+	local tmp:2 = *address;
+	*address = tmp+sized_val2;
+}
+:s^address^"add" is opcode=0x1b & sop=1 & address & sized_val4 {
+	build address;
+	build sized_val4;
+	local tmp:4 = *address;
+	*address = tmp+sized_val4;
+}
+
+:s^address^"sub" is opcode=0x1b & sop=2 & address & sized_val1 {
+	build address;
+	build sized_val1;
+	local tmp:1 = *address;
+	*address = tmp-sized_val1;
+}
+:s^address^"sub" is opcode=0x1b & sop=2 & address & sized_val2 {
+	build address;
+	build sized_val2;
+	local tmp:2 = *address;
+	*address = tmp-sized_val2;
+}
+:s^address^"sub" is opcode=0x1b & sop=2 & address & sized_val4 {
+	build address;
+	build sized_val4;
+	local tmp:4 = *address;
+	*address = tmp-sized_val4;
 }
 
 :itof operand is opcode=0x1c & subtype=0 & operand {
